@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # O Coração do Estado (Cache e Geo)
+  redis:
+    image: redis:7-alpine
+    container_name: argus-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - argus-network
+
+  # Shard 01 do Banco de Dados
+  db_shard_01:
+    image: postgres:15-alpine
+    container_name: argus-db-shard-01
+    environment:
+      POSTGRES_USER: igor
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: argus_shard_01
+    ports:
+      - "5433:5432" # Porta externa 5433 para não conflitar com seu Postgres local
+    networks:
+      - argus-network
+
+  # Shard 02 do Banco de Dados
+  db_shard_02:
+    image: postgres:15-alpine
+    container_name: argus-db-shard-02
+    environment:
+      POSTGRES_USER: igor
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: argus_shard_02
+    ports:
+      - "5434:5432" # Porta externa 5434
+    networks:
+      - argus-network
+
+networks:
+  argus-network:
+    driver: bridge

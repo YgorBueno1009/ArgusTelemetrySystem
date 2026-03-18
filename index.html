@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Argus Monitor Pro - Real Time</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 650px; width: 100%; border-radius: 12px; border: 3px solid #333; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #1a1a1a; color: white; }
+        .info { padding: 15px; background: #2d2d2d; margin-bottom: 15px; border-radius: 8px; border-left: 5px solid #007bff; }
+        .alert-active { color: #ff4d4d; font-weight: bold; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h2>🚚 Monitoramento de Frota: <span id="truckName" style="color: #00d4ff;">TRUCK-1</span></h2>
+        <p>Status: <span id="status">Conectado</span> | Velocidade: <span id="speed">0</span> km/h</p>
+        <p id="alertMsg" style="display: none;" class="alert-active">⚠️ ALERTA: VELOCIDADE ACIMA DO LIMITE (80km/h)</p>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 1. Configuração do Mapa
+        const map = L.map('map').setView([-15.7941, -47.8825], 14);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        // 2. Definição dos Ícones (Normal vs Alerta)
+        const blueIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        });
+
+        const redIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        });
+
+        // 3. Variáveis de Controle
+        const marker = L.marker([-15.7941, -47.8825], {icon: blueIcon}).addTo(map);
+        const truckId = "TRUCK-1";
+        
+        // Polylines (O Rastro)
+        let pathCoordinates = [];
+        const polyline = L.polyline([], {color: '#00d4ff', weight: 4, opacity: 0.6}).addTo(map);
+
+        async function updateMap() {
+            try {
+                const response = await fetch(`http://localhost:8081/trucks/${truckId}`);
+                const data = await response.json();
+                
+                if (data && data.latitude) {
+                    const newPos = [data.latitude, data.longitude];
+                    const speed = data.speed;
+
+                    // A. Atualiza Posição e Rastro
+                    marker.setLatLng(newPos);
+                    pathCoordinates.push(newPos);
+                    polyline.setLatLngs(pathCoordinates);
+                    
+                    // Se o rastro ficar muito longo, podemos limitar (ex: últimos 50 pontos)
+                    if (pathCoordinates.length > 50) pathCoordinates.shift();
+
+                    map.panTo(newPos);
+
+                    // B. Lógica de Alerta Visual
+                    if (speed > 80.0) {
+                        marker.setIcon(redIcon);
+                        document.getElementById("alertMsg").style.display = "block";
+                        document.getElementById("speed").style.color = "#ff4d4d";
+                    } else {
+                        marker.setIcon(blueIcon);
+                        document.getElementById("alertMsg").style.display = "none";
+                        document.getElementById("speed").style.color = "white";
+                    }
+
+                    document.getElementById("speed").innerText = speed.toFixed(1);
+                    document.getElementById("status").innerText = "Em Movimento";
+                    document.getElementById("status").style.color = "#00ff88";
+                }
+            } catch (err) {
+                document.getElementById("status").innerText = "Sem sinal do Core";
+                document.getElementById("status").style.color = "orange";
+            }
+        }
+
+        setInterval(updateMap, 2000);
+    </script>
+</body>
+</html>
